@@ -3,9 +3,7 @@ import time
 from enum import Enum
 import heapq
 
-
 time0 = time.time()
-
 c = 10 #number of cities
 max_distance = 15 # maximal distance between cities
 ID = 0 
@@ -14,10 +12,9 @@ trucks = []
 cities = []
 capacity = 10
 max_weight = 9
-
 number_of_packages = 0
 
-def findShortesPath(graph, start, goal):
+def dijkstra(graph, start, goal):
     # Tworzymy kolejkę priorytetową i dodajemy do niej początkowy wierzchołek
     queue = [(0, start)]
     # Tworzymy słownik z odległościami od początkowego wierzchołka do pozostałych wierzchołków
@@ -49,16 +46,18 @@ class States(Enum):
 
 
 class Truck:
-    def __init__(self, truck_ID, curr_position, capacity):
+    def __init__(self, truck_ID, curr_position, capacity, map):
         self.ID = truck_ID
         self.curr_position = curr_position
         self.capacity = capacity
+        self.map = map
         self.orders = []
         self.weight = 0
         self.delta_t = 0
         self.state = States.getting
         self.total_distance = 0
         self.courses = 0
+        self.ChooseAlgorithm = Truck.choose_orders_inorder
 
     def update(self, timestep):
         self.delta_t -= timestep
@@ -67,7 +66,9 @@ class Truck:
         if self.state == States.getting:
             self.printAction()
             self.delta_t = 1
-            self.wez_paczuche(self.choose_orders_inorder())
+            self.pass_orders()
+
+            self.wez_paczuche(self.ChooseAlgorithm(self))
             self.state = States.riding
         elif self.state == States.riding:
             self.printAction()
@@ -86,6 +87,7 @@ class Truck:
     def printAction(self):
         pass
         #print("Ciężarówka: ", self.ID, "robi-> ", self.state)
+
     def get_order(self, order):
         self.orders.append(order)
         self.weight += order.weight
@@ -128,12 +130,56 @@ class Truck:
                 self.weight -= self.orders[-1].weight
                 self.orders.pop()
 
+    def pass_orders(self):
+        for _ in self.orders:
+            self.pass_order(self.orders.pop())
+        
+    def pass_order(self, order):
+        cities[self.curr_position].dodaj_zamowienie_existing(order)
+        self.weight -= order.weight
+
+    #choosing algorithms
+    #zachłanny
     def choose_orders_inorder(self):
         global cities
         IDs = []
         for order in cities[self.curr_position].orders:
             IDs.append(order.ID)
         return IDs
+    #dijkstra
+    def choose_orders_dijkstra(self):
+        global cities
+        weight = 0
+        IDs = []
+
+        if(len(cities[self.curr_position].orders) == 0):
+            return IDs
+
+        closestOrder = cities[self.curr_position].orders[0]
+        closestPath = dijkstra(self.map, self.curr_position, closestOrder.destination)
+        
+        for order in cities[self.curr_position].orders:
+            if (dijkstra(self.map, self.curr_position, order.destination)['distance'] < closestPath['distance']):
+                closestOrder = order
+
+        IDs.append(closestOrder.ID)
+        weight += closestOrder.weight
+
+        orders = []
+        for order in cities[self.curr_position].orders:
+            if order.ID == closestOrder.ID:
+                continue
+            orders.append({"order" : order, "distance" : dijkstra(self.map, closestOrder.destination, order.destination)['distance']})
+        
+        orders.sort(key=lambda x: x['distance'])
+
+        for order in orders:
+            if(order["order"].weight + weight > self.capacity):
+                continue
+            IDs.append(order["order"].ID)
+        return IDs
+
+        
     
     def drive(self, destination):
         if(self.state == States.riding):
@@ -150,8 +196,6 @@ class Truck:
                         self.curr_position = idx
                         break
     
-
-
 
 class Package:
     def __init__(self, destination, weight, package_ID):
@@ -180,6 +224,7 @@ class City:
         for idx, order in enumerate(self.orders):
             if(order.ID == ID):
                 return self.orders.pop(idx)
+
     def add_orders_random(self, number_of_orders, weight_min, weight_max):
         global number_of_packages
         number_of_packages += number_of_orders
@@ -201,6 +246,7 @@ class Map:
                 temp = random.randint(1, max_distance)
                 self.paths[a][b] = temp
                 self.paths[b][a] = temp
+
     def generate_connected_graph(self, num_vertices, density, len_min, len_max):
         self.paths = [[0 for _ in range(num_vertices)] for _ in range(num_vertices)]
         for i in range(num_vertices-1):
@@ -219,17 +265,17 @@ class Map:
         [print(row) for row in self.paths]
 
 
-def generowanko_ciezarowek(trucks_number, trucks, c, capacity):
+def generowanko_ciezarowek(trucks_number, trucks, c, capacity, map):
     for i in range(trucks_number):
         truck_ID = i
         curr_position = random.randint(0, c-1)
-        trucks.append(Truck(i, curr_position, capacity))
+        trucks.append(Truck(i, curr_position, capacity, map))
+        trucks[-1].ChooseAlgorithm = Truck.choose_orders_dijkstra
 
 
 def printowanko_odleglosci(m): # wypisywanie macierzy z odleglosciami miedzy miastami
     for a in range(len(m)):
         print (m[a])
-
 
 
 map = Map(c)
@@ -243,7 +289,7 @@ for idx, path in enumerate(map.paths):
 #for city in cities:
 #    city.print_orders()
 
-generowanko_ciezarowek(trucks_number, trucks, c, capacity)
+generowanko_ciezarowek(trucks_number, trucks, c, capacity, map.paths)
 
 while number_of_packages > 0:
     for truck in trucks:
