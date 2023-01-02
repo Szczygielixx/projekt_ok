@@ -2,17 +2,7 @@ import random
 import time
 from enum import Enum
 import heapq
-
-time0 = time.time()
-ID = 0 
-trucks = []
-cities = []
-number_of_packages = 0
-c = 50 #number of cities
-max_distance = 15 # maximal distance between cities
-trucks_number = 25 #number of trucks
-capacity = 25 #capacity of a single truck 
-max_weight = 9 #maximal weight of a single package
+import copy
 
 
 class States(Enum):
@@ -248,15 +238,16 @@ class Map:
 
 
 def generate_trucks(trucks_number, trucks, c, capacity, map):
-    for i in range(trucks_number):
-        truck_ID = i
+    for truck_id in range(trucks_number):
         curr_position = random.randint(0, c-1)
-        trucks.append(Truck(i, curr_position, capacity, map))
-        #trucks[-1].ChooseAlgorithm = Truck.choose_orders_dijkstra
-        #trucks[-1].ChooseDrivingAlgorithm = Truck.choose_city_dijkstra
-        trucks[-1].ChooseAlgorithm = Truck.choose_orders_inorder
-        trucks[-1].ChooseDrivingAlgorithm = Truck.choose_city_random
+        trucks.append(Truck(truck_id, curr_position, capacity, map))
 
+
+def set_algorithms(trucks, chosen_algorithm, chosen_driving_mode):
+    for truck in trucks:
+        truck.ChooseAlgorithm = chosen_algorithm
+        truck.ChooseDrivingAlgorithm = chosen_driving_mode
+        
 
 def print_adjacency_matrix(m): # wypisywanie macierzy z odleglosciami miedzy miastami
     [print (m[a]) for a in range(len(m))]
@@ -287,32 +278,72 @@ def dijkstra(graph, start, goal):
                     heapq.heappush(queue, (distances[i]['distance'], i))
 
 
+def algorithm(trucks):
+    global number_of_packages
+    global initial_orders
+    while number_of_packages > 0:
+        if(number_of_packages < initial_orders):
+            initial_orders -= order_step
+            print("Packages remaining to be delivered: ", number_of_packages)
+        for truck in trucks:
+            truck.update(1)
+
+
+def count_parameters(trucks):
+    total = 0
+    courses = 0
+    for truck in trucks:
+        total += truck.total_distance
+        courses += truck.courses
+    return {"total" : total, "courses" : courses}
+
+
+def generate_random_packages(map, cities):
+    for idx, path in enumerate(map.paths):
+        cities.append(City(path, idx))
+        cities[-1].add_orders_random(random.randint(150,200), 1, max_weight)
+
+def print_parameters(start, end, result):
+    print("Total distance made by trucks: ", result["total"], "Number of courses: ", result["courses"])
+    print("Runtime: ", end-start)
+
 #-----MAIN-----
+number_of_packages, ID, trucks, cities = 0 , 0, [], []
+c = 60                          #number of cities
+max_distance = 15               #maximal distance between cities
+trucks_number = 25              #number of trucks
+capacity = 25                   #capacity of a single truck 
+max_weight = 9                  #maximal weight of a single package
 map = Map(c)
 map.generate_connected_graph(c, 0.5, 1, 50)
 #map.print()
-
-for idx, path in enumerate(map.paths):
-    cities.append(City(path, idx))
-    cities[-1].add_orders_random(random.randint(150,200), 1, max_weight)
-generate_trucks(trucks_number, trucks, c, capacity, map.paths)
-
-initial_orders = number_of_packages
-order_step = initial_orders/100
-total = 0
-courses = 0
-
-while number_of_packages > 0:
-    if(number_of_packages < initial_orders):
-        initial_orders -= order_step
-        print("Packages remaining to be delivered: ", number_of_packages)
-    for truck in trucks:
-        truck.update(1)
-
-for truck in trucks:
-    total += truck.total_distance
-    courses += truck.courses
-
-print("Total distance made by trucks: ", total, "Number of courses: ", courses)
 #print_adjacency_matrix(map.paths)
-print("Runtime: %s seconds" % (time.time() - time0))
+generate_random_packages(map, cities)
+generate_trucks(trucks_number, trucks, c, capacity, map.paths)
+map_cpy = copy.deepcopy(map)
+cities_cpy = copy.deepcopy(cities)
+trucks_cpy = copy.deepcopy(trucks)
+initial_orders = number_of_packages
+initial_orders_cpy = initial_orders
+order_step = initial_orders/100
+total, courses = 0, 0
+set_algorithms(trucks, Truck.choose_orders_inorder, Truck.choose_city_random)
+
+print("WERSJA ZACHLANNA")
+start = time.perf_counter()
+algorithm(trucks)
+result = count_parameters(trucks)
+end = time.perf_counter()
+print_parameters(start, end, result)
+
+print("WERSJA ZOPTYMALIZOWANA")
+set_algorithms(trucks_cpy, Truck.choose_orders_dijkstra, Truck.choose_city_dijkstra)
+total, courses = 0, 0
+number_of_packages = initial_orders_cpy
+initial_orders = initial_orders_cpy
+cities = cities_cpy
+start = time.perf_counter()
+algorithm(trucks_cpy)
+result = count_parameters(trucks_cpy)
+end = time.perf_counter()
+print_parameters(start, end, result)
