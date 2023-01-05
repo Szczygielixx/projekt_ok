@@ -166,6 +166,9 @@ class Truck:
     def choose_city_random(self):
         return random.randint(0,len(self.map)-1)
 
+    def brute_force(self):
+        pass
+
 
 class Package:
     def __init__(self, destination, weight, package_ID):
@@ -212,7 +215,7 @@ class Map:
     def __init__(self, number_of_cities):
         self.paths = [[-1 for b in range(c)] for a in range(c)]
 
-    def wypelnianko(self): 
+    def filling_up_map(self): 
         for a in range(c-1):
             for b in range(a + 1, c):
                 temp = random.randint(1, max_distance)
@@ -301,7 +304,7 @@ def count_parameters(trucks):
 def generate_random_packages(map, cities):
     for idx, path in enumerate(map.paths):
         cities.append(City(path, idx))
-        cities[-1].add_orders_random(random.randint(150,200), 1, max_weight)
+        cities[-1].add_orders_random(random.randint(50,75), 1, max_weight)
 
 def print_parameters(start, end, result):
     print("Total distance made by trucks: ", result["total"], "Number of courses: ", result["courses"])
@@ -309,17 +312,18 @@ def print_parameters(start, end, result):
 
 #-----MAIN-----
 number_of_packages, ID, trucks, cities = 0 , 0, [], []
-c = 60                          #number of cities
-max_distance = 15               #maximal distance between cities
-trucks_number = 25              #number of trucks
+c = 30                          #number of cities
+max_distance = 70               #maximal distance between cities
+trucks_number = 1              #number of trucks
 capacity = 25                   #capacity of a single truck 
-max_weight = 9                  #maximal weight of a single package
+max_weight = 10                 #maximal weight of a single package
 map = Map(c)
 map.generate_connected_graph(c, 0.5, 1, 50)
 #map.print()
 #print_adjacency_matrix(map.paths)
 generate_random_packages(map, cities)
 generate_trucks(trucks_number, trucks, c, capacity, map.paths)
+
 map_cpy = copy.deepcopy(map)
 cities_cpy = copy.deepcopy(cities)
 trucks_cpy = copy.deepcopy(trucks)
